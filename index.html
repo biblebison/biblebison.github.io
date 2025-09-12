@@ -1,26 +1,49 @@
 <!DOCTYPE html>
 
 <html lang="en">
-    
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My Website</title>
-</head>
-
-<p>Bible Bison</p>
-
-<div id="verse"></div>
-
-<script>
-  async function loadVerse() {
-    try {
-      let response = await fetch("https://beta.ourmanna.com/api/v1/get/?format=text"); 
-      let verse = await response.text();
-      document.getElementById("verse").innerText = verse;
-    } catch (e) {
-      document.getElementById("verse").innerText = "Verse of the Day unavailable.";
+  <title>My Website - Verse of the Day</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 40px;
+      background-color: #f9f9f9;
     }
-  }
-  loadVerse();
-</script>
+    h1 {
+      color: #333;
+    }
+    #verse {
+      margin-top: 20px;
+      padding: 20px;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      font-size: 1.2em;
+      line-height: 1.5em;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>Verse of the Day</h1>
+  <div id="verse">Loading...</div>
+
+  <script>
+    async function loadVerse() {
+      try {
+        let response = await fetch("https://beta.ourmanna.com/api/v1/get/?format=text");
+        let verse = await response.text();
+        document.getElementById("verse").innerText = verse;
+      } catch (e) {
+        document.getElementById("verse").innerText = "Verse of the Day unavailable.";
+      }
+    }
+    loadVerse();
+  </script>
+</body>
+</html>
