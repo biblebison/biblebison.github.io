@@ -49,3 +49,14 @@ body {
     font-size: 0.9em;
     color: #000000;
   }
+
+  .fade-in {
+    opacity: 0;                /* start invisible */
+    animation: fadeIn 1.77s forwards; /* 2 seconds, apply final state */
+  }
+  
+  @keyframes fadeIn {
+    to {
+      opacity: 1;              /* fade to fully visible */
+    }
+  }
