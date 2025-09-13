@@ -9,8 +9,35 @@
 </head>
 <body>
   <h1>Verse of the Day</h1>
+
+  <div id="datetime">
+    <p id="date"></p>
+    <!--<p id="time"></p>--> <!-- Time is optional, uncomment if needed -->
+  </div>
+  
+  <!--Script below updates date and can do time as well-->
+  <script>
+    function updateDateTime() {
+      const now = new Date();
+  
+      // Date
+      const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+      const date = now.toLocaleDateString(undefined, options);
+  
+      // Time
+      const time = now.toLocaleTimeString();
+  
+      document.getElementById("date").textContent = date;
+      document.getElementById("time").textContent = time;
+    }
+  
+    updateDateTime();
+    setInterval(updateDateTime, 1000);
+  </script>
+
   <div id="verse">Loading...</div>
 
+  <!--Script below loads the verse of the day-->
   <script>
     async function loadVerse() {
       try {
@@ -24,7 +51,7 @@
     loadVerse();
   </script>
 
-  <img src="img/Bilbo_The_Bison777w.png" class="centered-image">
+  <img src="img/Bilbo_The_Bison777.png" class="centered-image">
 
 </body>
 </html>
