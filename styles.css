@@ -39,7 +39,8 @@ body {
   .centered-image {
     display: block;
     margin: 5px auto 0 auto; /* centers the image */
-    max-width: 80%;   /* keeps it responsive */
+    max-width: 400px;   /* keeps it responsive */
+    width: 80%;
     height: auto;
     border-radius: 12px; /* optional: rounded corners */
   }
