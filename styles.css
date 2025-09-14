@@ -60,3 +60,29 @@ body {
       opacity: 1;              /* fade to fully visible */
     }
   }
+
+  /* Connect Button Style */
+#connectBtn {
+  background: linear-gradient(135deg, #eddadb, #fad0c4);
+  color: #333;
+  font-size: 1.2em;
+  font-weight: bold;
+  padding: 12px 30px;
+  border: none;
+  border-radius: 25px;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+  transition: all 0.3s ease;
+  margin-top: 20px;
+}
+
+#connectBtn:hover {
+  background: linear-gradient(135deg, #fad0c4, #ff9a9e);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(0,0,0,0.2);
+}
+
+#connectBtn:active {
+  transform: translateY(1px);
+  box-shadow: 0 3px 7px rgba(0,0,0,0.15);
+}

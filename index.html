@@ -11,34 +11,29 @@
 <body>
   <h1>Verse of the Day</h1>
 
+  <!-- Date & optional time -->
   <div id="datetime">
     <p id="date"></p>
-    <!--<p id="time"></p>--> <!-- Time is optional, uncomment if needed -->
+    <!--<p id="time"></p>--> <!-- uncomment if you want live time -->
   </div>
-  
-  <!--Script below updates date and can do time as well-->
+
   <script>
     function updateDateTime() {
       const now = new Date();
-  
-      // Date
       const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
       const date = now.toLocaleDateString(undefined, options);
-  
-      // Time
       const time = now.toLocaleTimeString();
-  
+
       document.getElementById("date").textContent = date;
       document.getElementById("time").textContent = time;
     }
-  
     updateDateTime();
     setInterval(updateDateTime, 1000);
   </script>
 
+  <!-- Verse of the Day -->
   <div id="verse" class="fade-in"></div>
 
-  <!--Script below loads the verse of the day-->
   <script>
     async function loadVerse() {
       try {
@@ -52,13 +47,52 @@
     loadVerse();
   </script>
 
+  <!-- Bilbo Image -->
   <img src="img/Bilbo_The_Bison777.png" class="centered-image">
 
-  <!-- Connect Button -->
-  <!--<button id="connectBtn">Connect</button>
-  <p id="status"></p>
-  <audio id="remoteAudio" autoplay></audio>-->
 
+
+
+<!-- Jitsi Connect Button -->
+<button id="connectBtn">Discuss Verse</button>
+
+<!-- Container for embedded Jitsi Meet -->
+<div id="jitsiContainer" style="width: 100%; height: 500px; margin-top: 20px;"></div>
+
+<script src="https://meet.jit.si/external_api.js"></script>
+<script>
+  const connectBtn = document.getElementById("connectBtn");
+  const jitsiContainer = document.getElementById("jitsiContainer");
+  let api = null; // store Jitsi instance globally
+
+  connectBtn.onclick = () => {
+    // Room name — same for everyone
+    const roomName = "BibleBison123";
+
+    // Clear previous Jitsi instance if exists
+    jitsiContainer.innerHTML = "";
+
+    const options = {
+      roomName: roomName,
+      width: "100%",
+      height: 500,
+      parentNode: jitsiContainer,
+      interfaceConfigOverwrite: {
+        TOOLBAR_BUTTONS: ["microphone", "camera", "hangup", "chat"]
+      }
+    };
+
+    // Create new Jitsi Meet instance
+    api = new JitsiMeetExternalAPI("meet.jit.si", options);
+
+    // Listen for when user leaves the conference
+    api.addEventListener("videoConferenceLeft", () => {
+      // Remove iframe / container content
+      jitsiContainer.innerHTML = "";
+      api = null;
+    });
+  };
+</script>
 
 </body>
 </html>
