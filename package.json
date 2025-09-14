@@ -1,0 +1,24 @@
+{
+    "name": "bible-bison",
+    "version": "1.0.0",
+    "description": "Verse of the Day website with voice chat feature",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js"
+    },
+    "author": "Your Name",
+    "license": "MIT",
+    "dependencies": {
+        "express": "^4.21.2",
+        "socket.io": "^4.8.1"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/biblebison/biblebison.github.io.git"
+    },
+    "keywords": [],
+    "bugs": {
+        "url": "https://github.com/biblebison/biblebison.github.io/issues"
+    },
+    "homepage": "https://github.com/biblebison/biblebison.github.io#readme"
+}
