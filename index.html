@@ -66,66 +66,68 @@
   let localStream;
   let isHub = false;
   let hubId = ROOM_ID;
-  
-  // Initialize everything
-  async function initPeer() {
-    await getLocalStream();
+
+  // Initialize peer but **do not request microphone yet**
+  function initPeer() {
     tryBecomeHub();
   }
-  
-  // Get microphone access
-  async function getLocalStream() {
-    if (!localStream) {
-      localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    }
-  }
-  
+
   // Try to become the hub
   function tryBecomeHub() {
     let hubCandidate = new Peer(ROOM_ID);
-  
+
     hubCandidate.on("open", id => {
       if (id === ROOM_ID) {
         peer = hubCandidate;
         hubId = id;
-        setupPeer(true);
+        setupPeer(true); // hub setup
         console.log("I am the HUB!");
       }
     });
-  
+
     hubCandidate.on("error", err => {
       if (err.type === "unavailable-id") {
         console.log("Hub exists, joining as participant...");
         peer = new Peer(); // random ID
-        setupPeer(false);
+        setupPeer(false); // participant setup
       }
     });
   }
-  
+
   // Setup peer (both hub and participant)
   function setupPeer(asHub) {
     isHub = asHub;
-  
+
     peer.on("open", id => {
       console.log("My PeerJS ID:", id, isHub ? "(Hub)" : "(Participant)");
       const idDiv = document.createElement("p");
       idDiv.innerText = "Your ID: " + id + (isHub ? " (Hub)" : "");
       document.body.appendChild(idDiv);
     });
-  
-    // Answer incoming calls
+
+    // Answer incoming calls (will wait for localStream)
     peer.on("call", call => {
-      call.answer(localStream);
+      if (localStream) {
+        call.answer(localStream);
+      } else {
+        // Delay answering until user grants mic access
+        const checkStream = setInterval(() => {
+          if (localStream) {
+            call.answer(localStream);
+            clearInterval(checkStream);
+          }
+        }, 100);
+      }
+
       call.on("stream", remoteStream => addAudioStream(call.peer, remoteStream));
     });
-  
+
     // Hub logic
     if (isHub) {
       peer.on("connection", conn => {
         conn.on("data", data => {
           if (data.join) {
             console.log("Broadcasting new user:", data.join);
-            // Inform all peers about the new user
             Object.values(peer.connections).forEach(conns => {
               conns.forEach(c => {
                 if (c.peer !== data.join) c.send({ join: data.join });
@@ -133,87 +135,94 @@
             });
           }
           if (data.leave) {
-            console.log("User left:", data.leave);
             removeAudioStream(data.leave);
           }
         });
-  
+
         conn.on("close", () => console.log("A participant disconnected"));
       });
     } else {
-      // Participant logic: connect to hub
-      connectToHub();
+      // Participant logic: wait for user to click button
     }
   }
-  
-  // Connect participant to hub
+
+  // Connect participant to hub (requires mic)
   function connectToHub() {
-    if (!peer) return;
-  
+    if (!peer || !localStream) return;
+
     const conn = peer.connect(hubId);
-  
+
     conn.on("open", () => {
       conn.send({ join: peer.id });
     });
-  
+
     conn.on("data", data => {
       if (data.join && data.join !== peer.id) {
         connectToNewUser(data.join, localStream);
       }
     });
-  
+
     conn.on("close", () => {
       console.log("Hub disconnected! Attempting to become new hub...");
-      setTimeout(tryBecomeHub, Math.random() * 500 + 200); // Randomized delay to avoid conflicts
+      setTimeout(tryBecomeHub, Math.random() * 500 + 200);
     });
-  
+
     conn.on("error", err => {
       console.log("Error connecting to hub:", err);
       setTimeout(tryBecomeHub, Math.random() * 500 + 200);
     });
-  
+
     // Clean up on leave
     window.addEventListener("beforeunload", () => {
       if (conn.open) conn.send({ leave: peer.id });
     });
   }
-  
+
   // Connect to a new user (peer-to-peer audio)
   function connectToNewUser(userId, stream) {
     if (peers[userId]) return;
-  
+
     const call = peer.call(userId, stream);
     call.on("stream", remoteStream => addAudioStream(userId, remoteStream));
     call.on("close", () => removeAudioStream(userId));
-  
+
     peers[userId] = call;
   }
-  
+
   // Add audio stream element
   function addAudioStream(id, stream) {
     let audioContainer = document.getElementById("audioContainer");
-    if (document.getElementById("audio-" + id)) return; // avoid duplicates
+    if (document.getElementById("audio-" + id)) return;
     let audio = document.createElement("audio");
     audio.id = "audio-" + id;
     audio.srcObject = stream;
     audio.autoplay = true;
     audioContainer.appendChild(audio);
   }
-  
+
   // Remove audio stream element
   function removeAudioStream(id) {
     const audio = document.getElementById("audio-" + id);
     if (audio) audio.remove();
   }
-  
-  // Button click: join the room
+
+  // **Discuss Verse button click**
   document.getElementById("connectBtn").onclick = async () => {
-    if (!localStream) await getLocalStream();
+    if (!localStream) {
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (err) {
+        alert("Microphone access is required to discuss the verse.");
+        return;
+      }
+    }
+
     if (!isHub && peer) connectToHub();
   };
-  
+
   initPeer();
-  </script>  
+</script>
+
 
 
 
