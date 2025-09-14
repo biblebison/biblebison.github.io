@@ -6,6 +6,7 @@
   <title>Bible Bison</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="icon" href="img/bilboicon01.png" type="image/png">
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 </head>
 
 <body>
@@ -52,47 +53,128 @@
 
 
 
-
-<!-- Jitsi Connect Button -->
+<!-- Discuss Verse Button -->
 <button id="connectBtn">Discuss Verse</button>
 
-<!-- Container for embedded Jitsi Meet -->
-<div id="jitsiContainer" style="width: 100%; height: 500px; margin-top: 20px;"></div>
+<!-- Container for all remote audio -->
+<div id="audioContainer"></div>
 
-<script src="https://meet.jit.si/external_api.js"></script>
 <script>
-  const connectBtn = document.getElementById("connectBtn");
-  const jitsiContainer = document.getElementById("jitsiContainer");
-  let api = null; // store Jitsi instance globally
+  const ROOM_ID = "BibleBisonRoom";
+  const peers = {};
+  let peer;
+  let localStream;
+  let isHub = false;
 
-  connectBtn.onclick = () => {
-    // Room name — same for everyone
-    const roomName = "BibleBison123";
+  function initPeer() {
+    // Try to claim the ROOM_ID (be the hub)
+    let hubCandidate = new Peer(ROOM_ID);
 
-    // Clear previous Jitsi instance if exists
-    jitsiContainer.innerHTML = "";
-
-    const options = {
-      roomName: roomName,
-      width: "100%",
-      height: 500,
-      parentNode: jitsiContainer,
-      interfaceConfigOverwrite: {
-        TOOLBAR_BUTTONS: ["microphone", "camera", "hangup", "chat"]
+    hubCandidate.on("open", id => {
+      if (id === ROOM_ID) {
+        peer = hubCandidate;
+        setupPeer(true);  // hub setup
       }
-    };
-
-    // Create new Jitsi Meet instance
-    api = new JitsiMeetExternalAPI("meet.jit.si", options);
-
-    // Listen for when user leaves the conference
-    api.addEventListener("videoConferenceLeft", () => {
-      // Remove iframe / container content
-      jitsiContainer.innerHTML = "";
-      api = null;
     });
+
+    // If ROOM_ID already taken, become participant
+    hubCandidate.on("error", err => {
+      if (err.type === "unavailable-id") {
+        console.log("Room already exists, joining as participant...");
+        peer = new Peer(); // random ID
+        setupPeer(false);  // participant setup
+      }
+    });
+  }
+
+  function setupPeer(asHub) {
+    isHub = asHub;
+
+    console.log("I am " + (isHub ? "the HUB" : "a participant"));
+
+    peer.on("open", id => {
+      const idDiv = document.createElement("p");
+      idDiv.innerText = "Your ID: " + id + (isHub ? " (Hub)" : "");
+      document.body.appendChild(idDiv);
+    });
+
+    // Answer incoming calls
+    peer.on("call", call => {
+      if (localStream) {
+        call.answer(localStream);
+        call.on("stream", remoteStream => {
+          addAudioStream(call.peer, remoteStream);
+        });
+      }
+    });
+
+    // Hub: forward join messages
+    if (isHub) {
+      peer.on("connection", conn => {
+        conn.on("data", data => {
+          if (data.join) {
+            console.log("Broadcasting new user:", data.join);
+            Object.values(peer.connections).forEach(conns => {
+              conns.forEach(c => {
+                if (c.peer !== data.join) {
+                  c.send({ join: data.join });
+                }
+              });
+            });
+          }
+        });
+      });
+    }
+  }
+
+  document.getElementById("connectBtn").onclick = async () => {
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+    if (!isHub) {
+      const conn = peer.connect(ROOM_ID);
+      conn.on("open", () => {
+        conn.send({ join: peer.id });
+      });
+
+      conn.on("data", data => {
+        if (data.join && data.join !== peer.id) {
+          connectToNewUser(data.join, localStream);
+        }
+      });
+    }
   };
+
+  function connectToNewUser(userId, stream) {
+    if (peers[userId]) return;
+    const call = peer.call(userId, stream);
+    call.on("stream", remoteStream => {
+      addAudioStream(userId, remoteStream);
+    });
+    call.on("close", () => {
+      removeAudioStream(userId);
+    });
+    peers[userId] = call;
+  }
+
+  function addAudioStream(id, stream) {
+    let audioContainer = document.getElementById("audioContainer");
+    let audio = document.createElement("audio");
+    audio.id = "audio-" + id;
+    audio.srcObject = stream;
+    audio.autoplay = true;
+    audioContainer.appendChild(audio);
+  }
+
+  function removeAudioStream(id) {
+    const audio = document.getElementById("audio-" + id);
+    if (audio) audio.remove();
+  }
+
+  initPeer();
 </script>
+
+
+
 
 </body>
 </html>
