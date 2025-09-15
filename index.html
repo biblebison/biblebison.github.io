@@ -56,12 +56,16 @@
   </script>
 
   <!-- Bilbo Image -->
-  <img id="bilbo" src="img/Bilbo_The_Bison777.png" class="bilbo-wrapper">
+  <img src="img/Bilbo_The_Bison777.png" class="bilbo-wrapper">
 
 
 
 <!-- Discuss Verse Button -->
 <button id="connectBtn">Discuss Verse</button>
+
+<!-- Connection Status -->
+<p id="connectionStatus" style="text-align:center; margin-top:10px; font-weight:bold;">
+</p>
 
 <!-- Container for all remote audio -->
 <div id="audioContainer"></div>
@@ -196,11 +200,19 @@
     return;
   }
   if (peers[userId]) return;
+
   const call = peer.call(userId, stream);
   call.on("stream", remoteStream => addAudioStream(userId, remoteStream));
-  call.on("close", () => removeAudioStream(userId));
+  call.on("close", () => {
+    removeAudioStream(userId);
+    delete peers[userId];
+    updateConnectionStatus(); // update when they leave
+  });
+
   peers[userId] = call;
+  updateConnectionStatus();   // update when they join
 }
+
 
   
   // Add audio element
@@ -217,9 +229,28 @@
   
   // Remove audio element
   function removeAudioStream(id) {
-    const audio = document.getElementById("audio-" + id);
-    if (audio) audio.remove();
+  const audio = document.getElementById("audio-" + id);
+  if (audio) audio.remove();
+  delete peers[id];
+  updateConnectionStatus(); // update when they’re removed
+}
+
+
+  function updateConnectionStatus() {
+  const count = Object.keys(peers).length;
+  const statusEl = document.getElementById("connectionStatus");
+
+  if (!localStream) {
+    statusEl.textContent = ""; // nothing until mic is enabled
+    return;
   }
+
+  if (count === 0) {
+    statusEl.textContent = "You are the only one here.";
+  } else {
+    statusEl.textContent = `Connected with ${count} other user${count > 1 ? "s" : ""}.`;
+  }
+}
   
   // Request microphone access and handle connections
   async function requestMic() {
@@ -244,8 +275,10 @@
   
   // Discuss Verse button click
   document.getElementById("connectBtn").onclick = async () => {
-    await requestMic();
-  };
+  await requestMic();
+  updateConnectionStatus(); // 👈 show initial status when mic is granted
+};
+
   
   // Start PeerJS
   initPeer();
