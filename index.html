@@ -130,39 +130,49 @@ function setupPeer() {
     call.on("stream", remoteStream => addAudioStream(call.peer, remoteStream));
   });
 
-  if (isHub) {
-    // Hub handles new connections
-    peer.on("connection", conn => {
-      conn.on("data", data => {
-        if (data.join) {
-          console.log("New participant joined:", data.join);
 
-          if (hubReady) connectToNewUser(data.join, localStream);
-          else queuedParticipants.push(data.join);
+const connectedPeerIds = []; // track all connected peers (hub does not include itself)
 
-          // Notify all existing peers about the new participant
-          Object.values(peer.connections).forEach(conns => {
-            conns.forEach(c => {
-              if (c.peer !== data.join) c.send({ join: data.join });
-            });
+if (isHub) {
+  peer.on("connection", conn => {
+    conn.on("data", data => {
+      if (data.join) {
+        console.log("New participant joined:", data.join);
+
+        // Add new participant to connectedPeerIds
+        if (!connectedPeerIds.includes(data.join)) connectedPeerIds.push(data.join);
+
+        // Connect them if hub ready
+        if (hubReady) connectToNewUser(data.join, localStream);
+        else queuedParticipants.push(data.join);
+
+        // Notify all existing peers about the new participant
+        Object.values(peer.connections).forEach(conns => {
+          conns.forEach(c => {
+            if (c.peer !== data.join) c.send({ join: data.join });
           });
+        });
 
-          // Tell new participant about existing peers
-          Object.keys(peers).forEach(existingPeerId => {
-            if (existingPeerId !== data.join) conn.send({ join: existingPeerId });
-          });
+        // Tell the new participant about all existing peers
+        connectedPeerIds.forEach(existingId => {
+          if (existingId !== data.join) conn.send({ join: existingId });
+        });
 
-          // Notify all participants to update their connection count
-          Object.values(peer.connections).forEach(conns => {
-            conns.forEach(c => c.send({ updateStatus: true }));
-          });
-        }
+        // Also send the hub's own ID
+        conn.send({ join: ROOM_ID });
 
-        // Participant receives updateStatus
-        if (data.updateStatus) updateConnectionStatus();
-      });
+        // Notify everyone to update connection count
+        Object.values(peer.connections).forEach(conns => {
+          conns.forEach(c => c.send({ updateStatus: true }));
+        });
+      }
+
+      // Participant receives updateStatus
+      if (data.updateStatus) updateConnectionStatus();
     });
-  }
+  });
+}
+
 }
 
 // Participant connects to hub
