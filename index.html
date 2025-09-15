@@ -85,48 +85,43 @@
   
   // Initialize PeerJS (try to become hub or participant)
   function initPeer() {
-  // Try to become the hub
-  const hubCandidate = new Peer(ROOM_ID, {
-    config: {
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'turn:TURN_SERVER_URL', username: 'USER', credential: 'PASS' }
-      ]
-    }
-  });
-
-  hubCandidate.on("open", id => {
-    if (id === ROOM_ID) {
-      // This peer is the hub
-      peer = hubCandidate;
-      isHub = true;
-      setupPeer();
-      console.log("I am the HUB!");
-    }
-  });
-
-  hubCandidate.on("error", err => {
-    if (err.type === "unavailable-id") {
-      // Hub already exists, become participant
-      console.log("Hub exists, joining as participant...");
-
-      peer = new Peer(null, { // null generates a random ID
-        config: {
-          iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'turn:TURN_SERVER_URL', username: 'USER', credential: 'PASS' }
-          ]
-        }
-      });
-
-      isHub = false;
-      setupPeer();
-    }
-  });
-}
-
+    // Try to become the hub
+    const hubCandidate = new Peer(ROOM_ID, {
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'turn:TURN_SERVER_URL', username: 'USER', credential: 'PASS' }
+        ]
+      }
+    });
   
-  // Common setup for both hub and participant
+    hubCandidate.on("open", id => {
+      if (id === ROOM_ID) {
+        peer = hubCandidate;
+        isHub = true;
+        setupPeer();
+        console.log("I am the HUB!");
+      }
+    });
+  
+    hubCandidate.on("error", err => {
+      if (err.type === "unavailable-id") {
+        console.log("Hub exists, joining as participant...");
+        peer = new Peer(null, {
+          config: {
+            iceServers: [
+              { urls: 'stun:stun.l.google.com:19302' },
+              { urls: 'turn:TURN_SERVER_URL', username: 'USER', credential: 'PASS' }
+            ]
+          }
+        });
+        isHub = false;
+        setupPeer();
+      }
+    });
+  }
+  
+  // Setup common peer logic
   function setupPeer() {
     peer.on("open", id => {
       console.log("Peer ID:", id, isHub ? "(Hub)" : "(Participant)");
@@ -137,7 +132,6 @@
       if (localStream) {
         call.answer(localStream);
       } else {
-        // Wait for mic access
         const interval = setInterval(() => {
           if (localStream) {
             call.answer(localStream);
@@ -145,43 +139,38 @@
           }
         }, 100);
       }
-  
       call.on("stream", remoteStream => addAudioStream(call.peer, remoteStream));
     });
   
     if (isHub) {
       // Hub forwards join requests
       peer.on("connection", conn => {
-      conn.on("data", data => {
-      if (data.join) {
-        console.log("New participant joined:", data.join);
-
-        if (hubReady) {
-          connectToNewUser(data.join, localStream);
-        } else {
-          queuedParticipants.push(data.join);
-        }
-
-        // Notify other participants about the new one
-        Object.values(peer.connections).forEach(conns => {
-          conns.forEach(c => {
-            if (c.peer !== data.join) {
-              c.send({ join: data.join });
-            }
-          });
-        });
-
-        // Also tell the new participant about all existing peers
-        Object.keys(peers).forEach(existingPeerId => {
-          if (existingPeerId !== data.join) {
-            conn.send({ join: existingPeerId });
+        conn.on("data", data => {
+          if (data.join) {
+            console.log("New participant joined:", data.join);
+  
+            // Connect them if ready, otherwise queue
+            if (hubReady) connectToNewUser(data.join, localStream);
+            else queuedParticipants.push(data.join);
+  
+            // Notify all existing peers about the new participant
+            Object.values(peer.connections).forEach(conns => {
+              conns.forEach(c => {
+                if (c.peer !== data.join) c.send({ join: data.join });
+              });
+            });
+  
+            // Tell the new participant about all existing peers
+            Object.keys(peers).forEach(existingPeerId => {
+              if (existingPeerId !== data.join) conn.send({ join: existingPeerId });
+            });
+  
+            // Also tell the new participant about the hub itself
+            conn.send({ join: ROOM_ID });
           }
         });
-      }
-    });
-  });
-}
-
+      });
+    }
   }
   
   // Participant connects to hub
@@ -189,78 +178,69 @@
     if (!peer || !localStream) return;
   
     const conn = peer.connect(hubId);
-  
-    conn.on("open", () => {
-      conn.send({ join: peer.id });
-    });
+    conn.on("open", () => conn.send({ join: peer.id }));
   
     conn.on("data", data => {
-      if (data.join && data.join !== peer.id) {
-        connectToNewUser(data.join, localStream);
-      }
+      if (data.join && data.join !== peer.id) connectToNewUser(data.join, localStream);
     });
   }
   
   // Connect to a peer for audio
   function connectToNewUser(userId, stream) {
-  if (!stream) {
-    console.warn("No localStream available yet for user", userId);
-    return;
+    if (!stream) {
+      console.warn("No localStream yet for", userId);
+      return;
+    }
+    if (peers[userId]) return;
+  
+    const call = peer.call(userId, stream);
+    call.on("stream", remoteStream => addAudioStream(userId, remoteStream));
+    call.on("close", () => {
+      removeAudioStream(userId);
+      delete peers[userId];
+      updateConnectionStatus();
+    });
+  
+    peers[userId] = call;
+    updateConnectionStatus();
   }
-  if (peers[userId]) return;
-
-  const call = peer.call(userId, stream);
-  call.on("stream", remoteStream => addAudioStream(userId, remoteStream));
-  call.on("close", () => {
-    removeAudioStream(userId);
-    delete peers[userId];
-    updateConnectionStatus(); // update when they leave
-  });
-
-  peers[userId] = call;
-  updateConnectionStatus();   // update when they join
-}
-
-
   
   // Add audio element
   function addAudioStream(id, stream) {
-  if (document.getElementById("audio-" + id)) return;
-  const audio = document.createElement("audio");
-  audio.id = "audio-" + id;
-  audio.srcObject = stream;
-  audio.autoplay = true;
-  audio.play().catch(err => console.log("Audio play error:", err));
-  document.getElementById("audioContainer").appendChild(audio);
-}
-
+    if (document.getElementById("audio-" + id)) return;
+    const audio = document.createElement("audio");
+    audio.id = "audio-" + id;
+    audio.srcObject = stream;
+    audio.autoplay = true;
+    audio.play().catch(err => console.log("Audio play error:", err));
+    document.getElementById("audioContainer").appendChild(audio);
+  }
   
   // Remove audio element
   function removeAudioStream(id) {
-  const audio = document.getElementById("audio-" + id);
-  if (audio) audio.remove();
-  delete peers[id];
-  updateConnectionStatus(); // update when they’re removed
-}
-
-
-  function updateConnectionStatus() {
-  const count = Object.keys(peers).length;
-  const statusEl = document.getElementById("connectionStatus");
-
-  if (!localStream) {
-    statusEl.textContent = ""; // nothing until mic is enabled
-    return;
+    const audio = document.getElementById("audio-" + id);
+    if (audio) audio.remove();
+    delete peers[id];
+    updateConnectionStatus();
   }
-
-  if (count === 0) {
-    statusEl.textContent = "You are the only one here.";
-  } else {
-    statusEl.textContent = `Connected with ${count} other user${count > 1 ? "s" : ""}.`;
-  }
-}
   
-  // Request microphone access and handle connections
+  // Update connection count display
+  function updateConnectionStatus() {
+    let count = Object.keys(peers).length;
+    if (!localStream) {
+      document.getElementById("connectionStatus").textContent = "";
+      return;
+    }
+  
+    // If participant, hub counts as 1
+    if (!isHub) count += 1;
+  
+    const statusEl = document.getElementById("connectionStatus");
+    if (count === 0) statusEl.textContent = "You are the only one here.";
+    else statusEl.textContent = `Connected with ${count} other user${count > 1 ? "s" : ""}.`;
+  }
+  
+  // Request mic access
   async function requestMic() {
     if (!localStream) {
       try {
@@ -273,24 +253,23 @@
   
     if (isHub) {
       hubReady = true;
-      // Call any queued participants
       queuedParticipants.forEach(userId => connectToNewUser(userId, localStream));
-      queuedParticipants.length = 0; // clear queue
+      queuedParticipants.length = 0;
     } else {
       connectToHub();
     }
   }
   
-  // Discuss Verse button click
+  // Button click
   document.getElementById("connectBtn").onclick = async () => {
-  await requestMic();
-  updateConnectionStatus(); // 👈 show initial status when mic is granted
-};
-
+    await requestMic();
+    updateConnectionStatus();
+  };
   
   // Start PeerJS
   initPeer();
   </script>
+  
   
 
 
