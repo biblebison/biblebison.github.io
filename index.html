@@ -18,6 +18,13 @@
     <!--<p id="time"></p>--> <!-- uncomment if you want live time -->
   </div>
 
+  <!-- Preload hover image -->
+  <script>
+    const hoverImg = new Image();
+    hoverImg.src = "img/Bilbo_The_Bison777t2.png"; // preload
+  </script>
+    
+
   <script>
     function updateDateTime() {
       const now = new Date();
@@ -49,7 +56,7 @@
   </script>
 
   <!-- Bilbo Image -->
-  <img src="img/Bilbo_The_Bison777.png" class="centered-image">
+  <img id="bilbo" src="img/Bilbo_The_Bison777.png" class="bilbo-wrapper">
 
 
 
