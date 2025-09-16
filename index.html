@@ -130,7 +130,6 @@ function setupPeer() {
     call.on("stream", remoteStream => addAudioStream(call.peer, remoteStream));
   });
 
-
 const connectedPeerIds = []; // track all connected peers (hub does not include itself)
 
 if (isHub) {
@@ -142,30 +141,29 @@ if (isHub) {
         // Add new participant to connectedPeerIds
         if (!connectedPeerIds.includes(data.join)) connectedPeerIds.push(data.join);
 
-        // Connect hub to new participant
+        // Connect them if hub ready
         if (hubReady) connectToNewUser(data.join, localStream);
         else queuedParticipants.push(data.join);
 
-        // ✅ Notify all existing peers about the new participant
+        // Notify all existing peers about the new participant
         Object.values(peer.connections).forEach(conns => {
           conns.forEach(c => {
             if (c.peer !== data.join) c.send({ join: data.join });
           });
         });
 
-        // ✅ Tell the new participant about all existing peers
+        // Tell the new participant about all existing peers
         connectedPeerIds.forEach(existingId => {
           if (existingId !== data.join) conn.send({ join: existingId });
         });
 
-        // ✅ Add hub’s own ID so participant always sees it
+        // Also send the hub's own ID
         conn.send({ join: ROOM_ID });
 
-        // ✅ Force everyone (including the new user) to update status
+        // Notify everyone to update connection count
         Object.values(peer.connections).forEach(conns => {
           conns.forEach(c => c.send({ updateStatus: true }));
         });
-        conn.send({ updateStatus: true }); // <-- 👈 add this line
       }
 
       // Participant receives updateStatus
@@ -173,7 +171,6 @@ if (isHub) {
     });
   });
 }
-
 
 }
 
