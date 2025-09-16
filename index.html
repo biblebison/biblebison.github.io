@@ -142,29 +142,30 @@ if (isHub) {
         // Add new participant to connectedPeerIds
         if (!connectedPeerIds.includes(data.join)) connectedPeerIds.push(data.join);
 
-        // Connect them if hub ready
+        // Connect hub to new participant
         if (hubReady) connectToNewUser(data.join, localStream);
         else queuedParticipants.push(data.join);
 
-        // Notify all existing peers about the new participant
+        // ✅ Notify all existing peers about the new participant
         Object.values(peer.connections).forEach(conns => {
           conns.forEach(c => {
             if (c.peer !== data.join) c.send({ join: data.join });
           });
         });
 
-        // Tell the new participant about all existing peers
+        // ✅ Tell the new participant about all existing peers
         connectedPeerIds.forEach(existingId => {
           if (existingId !== data.join) conn.send({ join: existingId });
         });
 
-        // Also send the hub's own ID
+        // ✅ Add hub’s own ID so participant always sees it
         conn.send({ join: ROOM_ID });
 
-        // Notify everyone to update connection count
+        // ✅ Force everyone (including the new user) to update status
         Object.values(peer.connections).forEach(conns => {
           conns.forEach(c => c.send({ updateStatus: true }));
         });
+        conn.send({ updateStatus: true }); // <-- 👈 add this line
       }
 
       // Participant receives updateStatus
@@ -172,6 +173,7 @@ if (isHub) {
     });
   });
 }
+
 
 }
 
